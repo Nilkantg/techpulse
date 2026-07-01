@@ -1,0 +1,26 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Airflow
+airflow/logs/
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/.env
+
+# GCP secrets — NEVER commit these
+gcp/*.json
+gcp/keys/
+*-key.json
+*credentials*.json
+
+# OS / editor
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Data (we don't want to commit raw/sample data dumps)
+*.csv
+*.parquet
