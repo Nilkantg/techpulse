@@ -1,0 +1,82 @@
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.1
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: "ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg="
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+
+    # Required for Airflow 2.9+
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.session,airflow.api.auth.backend.basic_auth"
+
+    AIRFLOW__WEBSERVER__SECRET_KEY: "techpulse-secret-key-change-in-prod"
+
+    GOOGLE_APPLICATION_CREDENTIALS: "/opt/airflow/gcp-key.json"
+
+    AIRFLOW_VAR_PROJECT_ID: "techpulse-poc-XXXX"
+    AIRFLOW_VAR_GCS_BRONZE: "techpulse-poc-XXXX-bronze"
+    AIRFLOW_VAR_GCS_SILVER: "techpulse-poc-XXXX-silver"
+    AIRFLOW_VAR_GCS_GOLD: "techpulse-poc-XXXX-gold"
+
+    AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT: "google-cloud-platform://?project=techpulse-poc-XXXX&key_path=/opt/airflow/gcp-key.json"
+
+  volumes:
+    - ../dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ../gcp/keys/techpulse-sa-key.json:/opt/airflow/gcp-key.json:ro
+
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+    restart: always
+
+  airflow-init:
+    <<: *airflow-common
+    command: >
+      bash -c "airflow db migrate &&
+      airflow users create
+      --username admin
+      --firstname TechPulse
+      --lastname Admin
+      --role Admin
+      --email admin@techpulse.com
+      --password admin"
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+
+    ports:
+      - "8080:8080"
+
+    restart: always
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+
+    restart: always
+
+volumes:
+  postgres-db-volume:
